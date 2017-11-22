@@ -1,0 +1,16 @@
+name = CERN Profiles - Display Real Name
+description = Overrides user login names with the LDAP DisplayName attribute. Enables redirection to Profiles site.
+core = 7.x
+
+dependencies[] = shib_auth
+
+files[] = cern_profiles_displayname.module
+files[] = cern_profiles_displayname.admin.inc
+files[] = cern_profiles_displayname.install
+files[] = cern_profiles_displayname.api.php
+files[] = cern_profiles_displayname.tokens.inc
+files[] = cern_profiles_displayname.default_settings.inc
+
+configure = admin/config/people/cern_profiles/displayname
+package = CERN Profiles
+version = 7.x-2.2-cern

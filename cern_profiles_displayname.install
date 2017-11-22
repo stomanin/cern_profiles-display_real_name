@@ -1,0 +1,167 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Install and uninstall functions for the cern_profiles_redirect module.
+ */
+ 
+/**
+ * Implements hook_schema().
+ */
+function cern_profiles_displayname_schema() {
+  $schema['cernrealname'] = array(
+    'description' => 'Computed Real Names to reduce overhead.',
+    'fields' => array(
+      'uid' => array(
+        'description' => 'User ID, links to User table.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'cernrealname' => array(
+        'description' => 'The generated real name of the user.',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'created' => array(
+        'description' => 'The UNIX timestamp of when the real name was created.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('uid'),
+    'indexes' => array(
+      'cernrealname' => array('cernrealname')
+    ),
+    'foreign keys' => array(
+      'users' => array(
+        'table' => 'users',
+        'columns' => array('uid' => 'uid'),
+      ),
+    ),
+  );
+
+  $schema['cernccid'] = array(
+    'description' => 'CCID for CERN accounts computed to reduce overhead.',
+    'fields' => array(
+      'uid' => array(
+        'description' => 'User ID, links to User table.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'cernccid' => array(
+        'description' => 'The generated CCID of the user.',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'created' => array(
+        'description' => 'The UNIX timestamp of when the real name was created.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('uid'),
+    'indexes' => array(
+      'cernccid' => array('cernccid')
+    ),
+    'foreign keys' => array(
+      'users' => array(
+        'table' => 'users',
+        'columns' => array('uid' => 'uid'),
+      ),
+    ),
+  );
+
+  $schema['cern_account_type'] = array(
+    'description' => 'CERN Account type for CERN accounts computed to reduce overhead.',
+    'fields' => array(
+      'uid' => array(
+        'description' => 'User ID, links to User table.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'cern_account_type' => array(
+        'description' => 'The generated CERN Account type of the user.',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'created' => array(
+        'description' => 'The UNIX timestamp of when the real name was created.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('uid'),
+    'indexes' => array(
+      'cern_account_type' => array('cern_account_type')
+    ),
+    'foreign keys' => array(
+      'users' => array(
+        'table' => 'users',
+        'columns' => array('uid' => 'uid'),
+      ),
+    ),
+  );
+
+  return $schema;
+}
+
+
+
+
+/**
+ * Implements hook_uninstall().
+ */
+function cern_profiles_displayname_uninstall() {
+  variable_del('LDAP_server');
+  variable_del('LDAP_port');
+  variable_del('LDAP_base_dn');
+  variable_del('LDAP_user_bind');
+  variable_del('LDAP_pass_bind');
+  variable_del('attribute');
+
+  variable_del('show_account_name');
+  
+  drupal_uninstall_schema('cern_profiles_displayname');
+
+  variable_del('profiles_site');
+  variable_del('enable_redirect');
+  }
+
+/**
+ * Add table cernccid to database
+ */
+function cern_profiles_displayname_update_7200() {
+  // Table to add to the schema
+  $table_name = 'cernccid';
+  $table = drupal_get_schema_unprocessed('cern_profiles_displayname', $table_name);
+  db_create_table($table_name, $table);
+}
+
+/**
+ * Add table cern_account_type to database
+ */
+function cern_profiles_displayname_update_7300() {
+  // Table to add to the schema
+  $table_name = 'cern_account_type';
+  $table = drupal_get_schema_unprocessed('cern_profiles_displayname', $table_name);
+  db_create_table($table_name, $table);
+}

@@ -1,1 +1,1 @@
-# cern_profiles-display_real_name
+# CERN Profiles - Display Real Name

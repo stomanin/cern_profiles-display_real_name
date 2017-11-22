@@ -1,0 +1,771 @@
+<?php
+
+/**
+ * @file
+ * Provides LDAP-based name displays for users.
+ */
+
+ include_once 'cern_profiles_displayname.default_settings.inc';
+
+
+/**
+ * Implements hook_permission().
+ */
+function cern_profiles_displayname_permission() {
+  $permissions['administer cern_profiles_displayname'] = array(
+    'title' => t('Administer CERN Profiles DisplayName configuration.'),
+    'description' => '<strong><a href="/admin/people/permissions#module-user">' . t('Remeber to set the \'<em>View user profile</em>\' permissions too (<em>User</em> section at the bottom of the page).') . '</a></strong>',
+    
+  );
+  return $permissions;
+}
+
+/**
+ * Implements hook_enable().
+ * Enable 'View user profiles' permissions for anonymous and authenticated users 
+ */
+function cern_profiles_displayname_enable() {  
+  user_role_grant_permissions(DRUPAL_ANONYMOUS_RID, array('access user profiles'));
+  user_role_grant_permissions(DRUPAL_AUTHENTICATED_RID, array('access user profiles'));
+  drupal_set_message(t('<strong>Please note</strong> that the \'<a href="/admin/people/permissions#module-user">View user profiles</a>\' permission has been granted for anonymous and authenticated users.'), 'warning');
+}
+
+/**
+ * Implements hook_disable().
+ * Disable 'View user profiles' permissions for anonymous and authenticated users 
+ */
+function cern_profiles_displayname_disable() {
+  user_role_revoke_permissions(DRUPAL_ANONYMOUS_RID, array('access user profiles'));
+  user_role_revoke_permissions(DRUPAL_AUTHENTICATED_RID, array('access user profiles'));
+  drupal_set_message(t('<strong>Please note</strong> that the \'<a href="/admin/people/permissions#module-user">View user profiles</a>\' permission has been revoked for anonymous and authenticated users.'), 'warning');
+}
+
+
+
+/**
+ * Implements hook_menu().
+ */
+function cern_profiles_displayname_menu() {
+  $items = array();
+  $items['admin/config/people/cern_profiles'] = array(
+    'title' => 'CERN Profiles',
+    'description' => 'Configure CERN Profiles modules.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('cern_profiles_displayname_settings_form'),
+    'access arguments' => array('administer cern_profiles_displayname'),
+    'file' => 'cern_profiles_displayname.admin.inc',
+  );
+  
+  $items['admin/config/people/cern_profiles/displayname'] = array(
+    'title' => '1. DisplayName',
+    'description' => 'Use LDAP to configure how user names are displayed.',
+
+    'file' => 'cern_profiles_displayname.admin.inc',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => 1,
+  );
+
+/*  $items['admin/config/people/cern_profiles/displayname'] = array(
+    'title' => '2. Redirect',
+    'description' => 'Configure the CERN Profiles site to override the links to users\' profile pages.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('cern_profiles_redirect_settings_form'),
+    'access arguments' => array('administer cern_profiles_redirect'),
+    'file' => 'cern_profiles_redirect.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 2,
+  );
+*/
+  return $items;
+}
+
+/**
+ * Implements hook_help().
+ */
+function cern_profiles_displayname_help($path, $arg) {
+  if ($path == 'admin/help#cern_profiles_displayname') {
+    $output = '';
+    $output .= '<h3>' . t('About') . '</h3>';  
+    $output .= '<p>'  . t('The CERN Profiles Displayname module overrides user login names with an LDAP attribute value (the displayname attribute by default). It also overrides link to users\' page to link to CERN Profiles site.') . '</p>';
+    $output .= '<h3>' . t('Uses') . '</h3>';
+    //$output .= '<p>'  . t('To force the update for the realname this module implements: ') . '</p>';  
+    
+    $output .= '<ol>';
+    $output .= '<li><em>Forcing real names to update</em>: ' . t('<a href="/admin/people">In the administration interface</a>, by selecting "Update real name" from the Update Options the real names for the selected users will be updated.') . '</li>';
+    $output .= '<li><em>Changing the LDAP attribute to display</em>: ' . t('<a href="/admin/config/people/cern_profiles/displayname">In the configuration settings interface</a>, change the "LDAP Attribute" to one of the following allowed attributes.') . '</li>';
+
+    $output .= '<ul>';
+    $output .= '<li><small><em>' . t('cn')                         . '</em></small></li>';
+    $output .= '<li><small><em>' . t('department')                 . '</em></small></li>';
+    $output .= '<li><small><em>' . t('description')                . '</em></small></li>';
+    $output .= '<li><small><em>' . t('displayName')                . '</em></small></li>';
+    $output .= '<li><small><em>' . t('employeeID')                 . '</em></small></li>';
+    $output .= '<li><small><em>' . t('gecos')                      . '</em></small></li>';
+    $output .= '<li><small><em>' . t('givenName')                  . '</em></small></li>';
+    $output .= '<li><small><em>' . t('sn')                         . '</em></small></li>';
+    $output .= '<li><small><em>' . t('mail')                       . '</em></small></li>';
+    $output .= '<li><small><em>' . t('physicalDeliveryOfficeName') . '</em></small></li>';
+    $output .= '<li><small><em>' . t('telephoneNumber')            . '</em></small></li>';
+    $output .= '</ul>';
+
+    $output .= '<li><em>Changing path to the Profiles site</em>: ' . t('<a href="/admin/config/people/cern_profiles/displayname">In the configuration settings interface</a>, change the "Path to the default CERN Profiles site".') . '</li>';
+    
+    $output .= '</ol>';    
+
+    $output .= '<h3>' . t('For developers and site builders') . '</h3>';
+
+    $output .= '<ul>';
+    $output .= '<li><em><strong>Blocks</strong></em>: ' . t('The block "Signed in as" can be enabled in the Block administration interface. This block displays a "Sign in" link if the user is not authenticated, while "Name Surname" and "Logout" buttons if the user has already signed in.') . '</li>';
+    $output .= '<li><em><strong>Views</strong></em>: ' . t('The real name and the CCID have been exposed to Views: if you need to include it in a view you can add it as a field, a filter or a contextual filter.') . '</li>';
+    $output .= '<li><em><strong>Token</strong></em>: ' . t('By enabling this module, the tokens will change: [user:name] will return the CERN Real name, while [user:name-raw] will return account name (NICE login name). You will also be able to access the CERN CCID for the user accounts.') . '</li>';
+    $output .= '<li>' . t('If you are writing PHP code, you can use the functions:');
+      $output .= '<ol>';
+      $output .= '<li><em><strong><a href="http://api.drupal.org/api/drupal/includes--common.inc/function/format_username/7">format_username</a>($account)</strong></em><br>
+                  <em>Parameters:</em> The account object for the user whose name is to be formatted. (ie. the user object for the user "stomanin")<br>
+                  <em>Return value:</em> An unsanitized string with the name and surname for the provided account to display. (ie. Silvia Tomanin) 
+                  </li>';
+      
+      $output .= '<li><em><strong>cern_profiles_displayname_link_to_profiles_site($account_name)</strong></em><br>
+                  <em>Parameters:</em> The account name for the user whose name is to be formatted. (ie. stomanin)<br>
+                  <em>Return value:</em> An unsanitized string with the name and surname for the provided account to display, linking to their user profile on the CERN Profiles site. (ie. <a href="http://profiles.web.cern.ch/695328">Silvia Tomanin</a>) 
+                 </li>';
+      $output .= '</ol>';
+    $output .= '</li>';
+
+ 
+    $output .= '</ul>';    
+
+    return $output;
+  }
+}
+
+
+
+/**
+ * Implements hook_username_alter().
+ */
+function cern_profiles_displayname_username_alter(&$name, $account) {
+  static $in_username_alter = FALSE;
+
+  if (empty($account->uid)) {
+    // Don't alter anonymous users or objects that do not have any user ID.
+    return;
+  }
+
+  $shownameacc = variable_get('show_account_name', DEFAULT_SHOW_ACCOUNT_NAME);
+
+  // Real name was loaded/generated via hook_user_load(), so re-use it.
+  if (!isset($account->cernrealname)) $account = user_load($account->uid);
+  if (isset($account->cernrealname)) {
+    if (!empty($account->cernrealname)) {
+      // Only if the real name is a non-empty string is $name actually altered.
+      $name = $account->cernrealname;
+      //if option's enabled show account name too
+      if ($shownameacc) {
+        $name = $name . ' (' . $account->name . ')';
+      }
+    }
+    return;
+  }
+
+  // Real name was not yet available for the account so we need to generate it.
+  // Because tokens may call format_username() we need to prevent recursion.
+  if (!$in_username_alter) {
+    $in_username_alter = TRUE;
+
+    // If $account->cernrealname was undefined, then the user account object was
+    // likely not properly loaded.
+    if ($realname_account = user_load($account->uid)) {
+      if ($realname = cern_profiles_displayname_load($realname_account)) {
+        $name = $realname;
+        
+      //if option's enabled show account name too
+      if ($shownameacc) {
+        $name = $name . ' (' . $account->name . ')';
+      }
+
+      }
+    }
+    $in_username_alter = FALSE;
+  }
+}
+
+
+
+
+/**
+ * Implements hook_user_load().
+ */
+function cern_profiles_displayname_user_load(array $accounts) {
+  $realnames = cern_profiles_displayname_load_multiple($accounts);
+  foreach ($realnames as $uid => $realname) {
+    $accounts[$uid]->cernrealname = $realname;
+  }
+  
+  //=======================    CCID   ================================
+    if (db_table_exists('cernccid')) {
+      $ccids = cern_profiles_displayname_load_multiple_ccids($accounts);  
+      foreach ($ccids as $uid => $ccid) {
+         $accounts[$uid]->cernccid = $ccid;
+      }
+    }
+  //==================================================================
+  //=======================    ACCOUNT TYPE   ================================
+    if (db_table_exists('cern_account_type')) {
+      $cern_account_types = cern_profiles_displayname_load_multiple_cern_account_types($accounts);  
+      foreach ($cern_account_types as $uid => $cern_account_type) {
+         $accounts[$uid]->cern_account_type = $cern_account_type;
+      }
+    }
+  //==================================================================
+  
+}
+
+/**
+ * Implements hook_user_update().
+ */
+function cern_profiles_displayname_user_update(array &$edit, stdClass $account, $category) {
+  // Since user data may have changed, delete the existing realname.
+  cern_profiles_displayname_delete($account->uid);
+}
+
+/**
+ * Implements hook_user_delete().
+ */
+function cern_profiles_displayname_user_delete(stdClass $account) {
+  cern_profiles_displayname_delete($account->uid);
+}
+
+/**
+ * Implements hook_user_operations().
+ */
+function cern_profiles_displayname_user_operations() {
+  $operations['cern_profiles_displayname_update'] = array(
+    'label' => t('Update real name'),
+    'callback' => 'cern_profiles_displayname_user_operations_realname_update',
+  );
+  return $operations;
+}
+
+/**
+ * Callback function for admin mass generating user real names.
+ *
+ * @param $uids
+ *   An array of user IDs.
+ */
+function cern_profiles_displayname_user_operations_realname_update(array $uids) {
+  $accounts = user_load_multiple($uids);
+  foreach ($accounts as $account) {
+    cern_profiles_displayname_update($account);
+  }
+}
+
+
+ /**
+ * Implements hook_views_api().
+ */
+function cern_profiles_displayname_views_api() {
+  return array(
+    'api' => 2,
+  );
+}
+
+
+/**
+* Implements hook_node_view().
+*/
+function cern_profiles_displayname_node_view($node, $view_mode) {
+  // Use cernrealname instead of account name in rss feeds
+  if ($view_mode == 'rss') {
+    $account = user_load($node->uid);
+    $creator = format_username($account);
+    // If empty, don't change the name 
+    if (!empty($creator)) {
+      $node->rss_elements[1] = array(
+        'key' => 'dc:creator',
+        'value' => $creator
+      );
+    } 
+  }
+}
+
+
+/**
+ * @addtogroup cern_profiles_displayname
+ * @{
+ */
+
+/**
+ * Loads a real name.
+ *
+ * @param $uid
+ *   A user account object.
+ * @return
+ *   The user's generated real name.
+ */
+function cern_profiles_displayname_load(stdClass $account) {
+  $realnames = cern_profiles_displayname_load_multiple(array($account->uid => $account));
+  return reset($realnames);
+
+}
+
+/**
+ * Loads multiple real names.
+ *
+ * @param $accounts
+ *   An array of user account objects keyed by user ID.
+ * @return
+ *   An array of real names keyed by user ID.
+ */
+function cern_profiles_displayname_load_multiple(array $accounts) {
+  $realnames = &drupal_static(__FUNCTION__, array());
+
+  if ($new_accounts = array_diff_key($accounts, $realnames)) {
+    // Attempt to fetch realnames from the database first.
+    $realnames += db_query("SELECT uid, cernrealname FROM {cernrealname} WHERE uid IN (:uids)", array(':uids' => array_keys($new_accounts)))->fetchAllKeyed();
+
+    // For each account that was not present in the database, generate its
+    // real name.
+    foreach ($new_accounts as $uid => $account) {
+      if (!isset($realnames[$uid])) {
+        $realnames[$uid] = cern_profiles_displayname_update($account);
+      }
+    }
+  }
+
+  return array_intersect_key($realnames, $accounts);
+}
+
+
+//=======================    CCID   ================================
+/**
+ * Loads multiple ccids.
+ *
+ * @param $accounts
+ *   An array of user account objects keyed by user ID.
+ * @return
+ *   An array of ccids keyed by user ID.
+ */
+function cern_profiles_displayname_load_multiple_ccids(array $accounts) {
+  $ccids = &drupal_static(__FUNCTION__, array());
+
+  if ($new_accounts = array_diff_key($accounts, $ccids)) {
+    // Attempt to fetch ccids from the database first.
+    $ccids += db_query("SELECT uid, cernccid FROM {cernccid} WHERE uid IN (:uids)", array(':uids' => array_keys($new_accounts)))->fetchAllKeyed();
+
+    // For each account that was not present in the database, generate its ccid.
+    foreach ($new_accounts as $uid => $account) {
+      if (!isset($ccid[$uid])) {
+        $ccid[$uid] = cern_profiles_displayname_update_ccid($account);
+      }
+    }
+  }
+
+  return array_intersect_key($ccids, $accounts);
+}
+//=================================================================
+
+//=======================    CERN ACCOUNT TYPE   ================================
+/**
+ * Loads multiple account types.
+ *
+ * @param $accounts
+ *   An array of user account objects keyed by user ID.
+ * @return
+ *   An array of account types keyed by user ID.
+ */
+function cern_profiles_displayname_load_multiple_cern_account_types(array $accounts) {
+  $cern_account_types = &drupal_static(__FUNCTION__, array());
+
+  if ($new_accounts = array_diff_key($accounts, $cern_account_types)) {
+    // Attempt to fetch cern account types from the database first.
+    $cern_account_types += db_query("SELECT uid, cern_account_type FROM {cern_account_type} WHERE uid IN (:uids)", array(':uids' => array_keys($new_accounts)))->fetchAllKeyed();
+
+    // For each account that was not present in the database, generate its cern_account_type.
+    foreach ($new_accounts as $uid => $account) {
+      if (!isset($cern_account_type[$uid])) {
+        $cern_account_type[$uid] = cern_profiles_displayname_update_cern_account_type($account);
+      }
+    }
+  }
+
+  return array_intersect_key($cern_account_types, $accounts);
+}
+//=================================================================
+
+
+
+/**
+ * Update the realname for a user account.
+ *
+ * @param $account
+ *   A user account object.
+ *
+ * @see hook_cern_profiles_displayname_alter()
+ * @see hook_cern_profiles_displayname_update()
+ */
+function cern_profiles_displayname_update($account) {
+ if ($account->uid != 0) {
+  $LDAPdefattribute = variable_get('attribute', DEFAULT_ATTRIBUTE);
+  
+  $realname = $account->name;
+  $realname = cern_profiles_displayname_get_attribute_value($account, $LDAPdefattribute);
+  $realname = trim(strip_tags($realname));
+  // The name must be trimmed to 255 characters before inserting into the database.
+  $realname = truncate_utf8($realname, 255);
+
+  // Allow other modules to alter the generated realname.
+  drupal_alter('cern_profiles_displayname', $realname, $account);
+
+  // Save to the database and the static cache.
+  db_merge('cernrealname')
+    ->key(array('uid' => $account->uid))
+    ->fields(array(
+      'cernrealname' => $realname,
+      'created' => REQUEST_TIME,
+    ))
+    ->execute();
+
+  // Allow modules to react to the realname being updated.
+  module_invoke_all('cern_profiles_displayname_update', $realname, $account);
+
+  $account->cernrealname = $realname;
+  return $realname;
+ }
+}
+
+//=======================    CCID   ================================
+/**
+ * Update the CCIDs for a user account.
+ *
+ * @param $account
+ *   A user account object.
+ *
+ */
+function cern_profiles_displayname_update_ccid($account) {
+ if ($account->uid != 0) {
+  $ccid = '';
+  $ccid = cern_profiles_displayname_get_attribute_value($account, 'employeeid');
+  $ccid = trim(strip_tags($ccid));
+  // The name must be trimmed to 255 characters before inserting into the database.
+  $ccid = truncate_utf8($ccid, 255);
+
+  // Save to the database and the static cache.
+  db_merge('cernccid')
+    ->key(array('uid' => $account->uid))
+    ->fields(array(
+      'cernccid' => $ccid,
+      'created' => REQUEST_TIME,
+    ))
+    ->execute();
+  $account->cernccid = $ccid;
+
+  return $ccid;
+ }
+}
+//==================================================================
+
+//=======================    CERN ACCOUNT TYPE   ================================
+/**
+ * Update the Cern Account Types for a user account.
+ *
+ * @param $account
+ *   A user account object.
+ *
+ */
+function cern_profiles_displayname_update_cern_account_type($account) {
+ if ($account->uid != 0) {
+  $cern_account_type = '';
+  $cern_account_type = cern_profiles_displayname_get_attribute_value($account, 'employeetype');
+  $cern_account_type = trim(strip_tags($cern_account_type));
+  // The name must be trimmed to 255 characters before inserting into the database.
+  $cern_account_type = truncate_utf8($cern_account_type, 255);
+
+  // Save to the database and the static cache.
+  db_merge('cern_account_type')
+    ->key(array('uid' => $account->uid))
+    ->fields(array(
+      'cern_account_type' => $cern_account_type,
+      'created' => REQUEST_TIME,
+    ))
+    ->execute();
+  $account->cern_account_type = $cern_account_type;
+
+  return $cern_account_type;
+ }
+}
+//==================================================================
+
+/**
+ * Returns attribute value from LDAP for a certain user given his account and the attribute name.
+ *
+ * @param $account
+ *   A user account object.
+ * @param $attribute
+ *   The attribute to retrieve.
+ */
+function cern_profiles_displayname_get_attribute_value($account, $attribute) {
+  $attribute_value = '';
+  //Get configuration for LDAP
+  $LDAPsrv = variable_get('LDAP_server', DEFAULT_LDAP_SERVER); 
+  $LDAPport = variable_get('LDAP_port', DEFAULT_LDAP_PORT); 
+  $LDAPbasedn = variable_get('LDAP_base_dn', DEFAULT_LDAP_BASE_DN); 
+  $LDAPbindusr = variable_get('LDAP_user_bind', DEFAULT_LDAP_USER_BIND); 
+  $LDAPbindpass = variable_get('LDAP_pass_bind', DEFAULT_LDAP_PASS_BIND);  
+
+  if (isset($LDAPsrv) && isset($LDAPport) && isset($LDAPbasedn)) {
+    //Retrieve CERN real name from LDAP DiplayName attribute
+    $conn = ldap_connect($LDAPsrv, $LDAPport); 
+    if (!$conn) {
+      watchdog('cern_profiles_displayname', 'Could not connect to LDAP server.', array(), WATCHDOG_WARNING);
+    }
+    else{
+      if (!ldap_bind($conn, $LDAPbindusr, $LDAPbindpass)) {
+        watchdog('cern_profiles_displayname', 'Could not bind to LDAP server.', array(), WATCHDOG_WARNING);
+      } 
+      else{
+        $cn = "(cn=" . $account->name . ")";
+ 
+        //Manage multiple DNs
+        $LDAPbasedn = explode(PHP_EOL, $LDAPbasedn); //create array
+        foreach ($LDAPbasedn as $whatever) $id[] = $conn;
+        $result = ldap_search($id, $LDAPbasedn, $cn); 
+        $search = FALSE; 
+        foreach ($result as $value) { 
+          if (ldap_count_entries($conn, $value) > 0) { 
+              $search = $value; 
+             break; 
+          } 
+        } 
+        if ($search) { 
+          $info = ldap_get_entries($conn, $search);
+          $attribute_value = $info[0][$attribute][0];  
+        } 
+        else {
+          watchdog('cern_profiles_displayname', '%attribute not found for %account.', array('%attribute' => $attribute,'%account' => $account->name), WATCHDOG_NOTICE);
+        } 
+        ldap_close($conn);
+      }
+    }
+  }
+  return $attribute_value;
+}
+
+
+/**
+ * Delete a real name.
+ *
+ * @param $uid
+ *   A user ID.
+ */
+function cern_profiles_displayname_delete($uid) {
+  return cern_profiles_displayname_delete_multiple(array($uid));
+}
+
+/**
+ * Delete multiple real names.
+ *
+ * @param $uids
+ *   An array of user IDs.
+ */
+function cern_profiles_displayname_delete_multiple(array $uids) {
+  db_delete('cernrealname')->condition('uid', $uids, 'IN')->execute();
+
+  //=======================    CCID   ================================
+  db_delete('cernccid')->condition('uid', $uids, 'IN')->execute();
+  //==================================================================
+  //=======================    CERN ACCOUNT TYPE   ================================
+  db_delete('cern_account_type')->condition('uid', $uids, 'IN')->execute();
+  //==================================================================
+  
+  drupal_static_reset('cern_profiles_displayname_load_multiple');
+}
+
+
+/**
+ * Delete all real names.
+ */
+function cern_profiles_displayname_delete_all() {
+  db_delete('cernrealname')->execute();
+  
+  //=======================    CCID   ================================
+  db_delete('cernccid')->execute();
+  //==================================================================
+  //=======================    CCID   ================================
+  db_delete('cern_account_type')->execute();
+  //==================================================================
+  drupal_static_reset('cern_profiles_displayname_load_multiple');
+}
+
+
+
+/**
+ * @} End of "addtogroup cern_profiles_displayname".
+ */
+
+ 
+ ///////////////////////////////////////////////////////////////    REDIRECT
+ 
+ /**
+ * Implements hook_url_outbound_alter().
+ */
+function cern_profiles_displayname_url_outbound_alter(&$path, &$options, $original_path) {
+  $enred = variable_get('enable_redirect', DEFAULT_ENABLE_REDIRECT);
+  if ($enred) {
+    $path_profiles_site = _cern_profiles_displayname_get_profiles_site_url(variable_get('profiles_site', DEFAULT_PROFILES_SITE));
+    $opt_enable_redirect_pages = variable_get('enable_redirect_pages',  array('edit' => DEFAULT_REDIRECT_EDIT, 
+                                                                               'contact' => DEFAULT_REDIRECT_CONTACT,
+                                                                               'devel' => DEFAULT_REDIRECT_DEVEL));
+                                                                               
+                                                                              
+ 
+  //if (preg_match('@^user[/\+%]+([0-9]+)(.*)?@', $path, $matches)) {
+  //if (preg_match('@^user[/\+%]+([0-9]+)?$@', $path, $matches)) {
+  //subdir to be matched
+  $subdirstr = '';
+  foreach ($opt_enable_redirect_pages as $key => $value) {
+    if ($value)
+      $subdirstr .= '|'.$key;
+  }
+  if (preg_match('@^user[/\+%]+([0-9]+)?[/\+%]?(view'.$subdirstr.')?$@', $path, $matches)) {
+
+          $account = user_load($matches[1]);  
+          // don't do anything if the ccid is not defined
+          if (isset($account->{'cernccid'})) {
+
+            // if external account redirect to unverified account page
+            if (substr($account->{'cernccid'}, 0, 1) == '-') {
+               $path = $path_profiles_site . DEFAULT_UNVERIFIED_ACCOUNT_PATH ;
+            }  
+            //if cern user redirect to ccid  (if not service)
+            else
+              if (isset($account->{'cern_account_type'}) && ($account->{'cern_account_type'} != 'Service'))
+                $path = $path_profiles_site . $account->{'cernccid'};
+              else 
+               $path = $path_profiles_site . DEFAULT_SERVICES_ACCOUNT_PATH ;
+            $options['external'] = TRUE;
+          }
+
+    } 
+    else {
+      if ($path=='user') {
+        global $user;
+        $account = user_load($user->uid);  
+        // don't do anything if the ccid is not defined
+        if (isset($account->{'cernccid'})) {
+  
+          // if external account DO NOT redirect
+          if (substr($account->{'cernccid'}, 0, 1) == '-') {
+              //$path = $path_profiles_site . $account->name;
+              $path = $path_profiles_site . DEFAULT_UNVERIFIED_ACCOUNT_PATH ;
+          }    
+          //if cern user redirect to ccid  (if not service)
+          else
+              if (isset($account->{'cern_account_type'}) && ($account->{'cern_account_type'} != 'Service'))
+                $path = $path_profiles_site . $account->{'cernccid'};
+              else 
+               $path = $path_profiles_site . DEFAULT_SERVICES_ACCOUNT_PATH ;
+
+          $options['external'] = TRUE;
+        }
+      }
+    }
+  }
+}
+
+
+
+
+
+/**
+ * Helper function to let other modules to print the name and link to the profiles site, 
+ * given an account name ".
+ * Returns the email address for external accounts.
+ */
+ 
+function cern_profiles_displayname_link_to_profiles_site($accountname) {
+  //Load the user with the account name passed to the function 
+   $account = user_load_by_name($accountname);
+  $path_profiles_site = _cern_profiles_displayname_get_profiles_site_url(variable_get('profiles_site', DEFAULT_PROFILES_SITE));
+  if ((format_username($account)!='Anonymous') && isset($account->cernccid) && isset($account->cern_account_type)&& ($account->cern_account_type != 'Service')) {
+    if ($account->cernccid != '-1')
+    //return the cern real name linking to the profile site
+      return l(format_username($account), $path_profiles_site . $account->cernccid);
+    //for external accounts returns the email address 
+    else
+      return $account->mail;
+  }
+  else 
+    return $accountname;
+}
+
+
+
+
+
+// CREATE "SIGNED IN AS" BLOCK
+
+/**
+ * Implements hook_block_info().
+ * Defines a block for displaying the 
+ * - the Sign in button if the user is not authenticated
+ * - the Name Surname and Logout buttons if the user is logged in
+ */
+function cern_profiles_displayname_block_info() {
+  $blocks = array();
+  $blocks['cern_loggedinas'] = array(
+    'info' => t('CERN Display Real Name - Signed in as'),
+    'cache' => DRUPAL_CACHE_PER_USER,
+  //  'status' => 1,
+  //  'region' => 'banner',
+  );
+  return $blocks;
+}
+
+
+/**
+ * Implements hook_block_view()
+ * Provide title and content for the block created
+ */
+function cern_profiles_displayname_block_view($delta = 'cern_loggedinas') {
+
+  $block = array();
+  $block['subject'] = NULL;
+  $block['content'] = _cern_profiles_displayname_get_block_content();
+  
+  return $block;
+}
+
+function _cern_profiles_displayname_get_block_content() {
+  global $user;
+  if ($user->uid == '0')
+    $output = '<div id="cern_signedinas"><a href="'.shib_auth_generate_login_url().'">Sign in</a></div>';  
+  else {
+    $enred = variable_get('enable_redirect', DEFAULT_ENABLE_REDIRECT);
+    if ($enred)
+      $output = '<div id="cern_signedinas">Signed in as '. cern_profiles_displayname_link_to_profiles_site($user->name).' | <a href="/user/logout">Sign out</a></div>';
+    else { 
+      $account = user_load($user->uid);
+      $output = '<div id="cern_signedinas">Signed in as ' . format_username($account) . ' | <a href="/user/logout">Sign out</a></div>';
+    }
+  }
+  return $output;
+
+}
+
+//////////////////////////////
+
+
+
+//Helper function to calculate the profiles site. 
+//HTTPS is active on the site, the profiles url will be enforced to HTTPS
+function _cern_profiles_displayname_get_profiles_site_url($path) {
+  global $is_https;
+  
+  if ($is_https) {
+    $options = array('https' => TRUE,);
+    return str_replace('http://', 'https://', $path);
+   }
+  else
+    return $path;
+}
